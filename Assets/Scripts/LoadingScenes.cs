@@ -5,9 +5,21 @@ using UnityEngine.SceneManagement;
 
 public class LoadingScenes : MonoBehaviour
 {
+    private ReturnScene countScene;
+
+    private void Start()
+    {
+        countScene = GetComponent<ReturnScene>();
+    }
+
     public void PlayGame()
     {
-        SceneManager.LoadScene(1);
+        int count = ReturnScene.count;
+
+        if (count == 0 || count != 0)
+        {
+            SceneManager.LoadScene(1);
+        }
     }
 
     public void Settings()
