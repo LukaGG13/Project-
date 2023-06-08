@@ -1,46 +1,128 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 public class PlayerMovement : MonoBehaviour
 {
-    public CharacterController controller;
+    [Header("Movement")]
+    public float moveSpeed;
 
-    public float speed = 12f;
-    public float gravity = -9.81f;
-    public float jump = 1f;
+    public float groundDrag;
 
-    public Transform groundCheck;
-    public float groundDistance = 0.4f;
-    public LayerMask groundMask;
+    public float jumpForce;
+    public float jumpCooldown;
+    public float airMultiplier;
+    bool readyToJump;
 
-    Vector3 velocity;
-    bool isGrounded;
+    [HideInInspector] public float walkSpeed;
+    [HideInInspector] public float sprintSpeed;
 
-    // Update is called once per frame
-    void Update()
+    [Header("Keybinds")]
+    public KeyCode jumpKey = KeyCode.Space;
+
+    [Header("Ground Check")]
+    public float playerHeight;
+    public LayerMask whatIsGround;
+    bool grounded;
+
+    public Transform orientation;
+
+    float horizontalInput;
+    float verticalInput;
+
+    Vector3 moveDirection;
+
+    Rigidbody rb;
+
+    private void Start()
     {
-        isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask);
+        rb = GetComponent<Rigidbody>();
+        rb.freezeRotation = true;
 
-        if (isGrounded && velocity.y < 0)
+        readyToJump = true;
+    }
+
+    private void Update()
+    {
+        // ground check
+
+        grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + 0.3f, whatIsGround);
+
+        MyInput();
+        SpeedControl();
+
+        // handle drag
+
+        if (grounded)
+            rb.drag = groundDrag;
+        else
+            rb.drag = 0;
+    }
+
+    private void FixedUpdate()
+    {
+        MovePlayer();
+    }
+
+    private void MyInput()
+    {
+        horizontalInput = Input.GetAxisRaw("Horizontal");
+        verticalInput = Input.GetAxisRaw("Vertical");
+
+        // when to jump
+
+        if (Input.GetKey(jumpKey) && readyToJump && grounded)
         {
-            velocity.y = -2f;
+            readyToJump = false;
+
+            Jump();
+
+            Invoke(nameof(ResetJump), jumpCooldown);
         }
+    }
 
-        float x = Input.GetAxis("Horizontal");
-        float z = Input.GetAxis("Vertical");
+    private void MovePlayer()
+    {
+        // calculate movement direction
 
-        Vector3 move = transform.right * x + transform.forward * z;
+        moveDirection = orientation.forward * verticalInput + orientation.right * horizontalInput;
 
-        controller.Move(move * speed * Time.deltaTime);
+        // on ground
 
-        if (Input.GetButtonDown("Jump") && isGrounded)
+        if (grounded)
+            rb.AddForce(moveDirection.normalized * moveSpeed * 10f, ForceMode.Force);
+
+        // air
+
+        else if (!grounded)
+            rb.AddForce(moveDirection.normalized * moveSpeed * 10f * airMultiplier, ForceMode.Force);
+    }
+
+    private void SpeedControl()
+    {
+        Vector3 flatVel = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
+
+        // limit velocity
+
+        if (flatVel.magnitude > moveSpeed)
         {
-            velocity.y = Mathf.Sqrt(jump * -2f * gravity);
+            Vector3 limitedVel = flatVel.normalized * moveSpeed;
+            rb.velocity = new Vector3(limitedVel.x, rb.velocity.y, limitedVel.z);
         }
+    }
 
-        velocity.y += gravity * Time.deltaTime;
+    private void Jump()
+    {
+        // reset y velocity
 
-        controller.Move(velocity * Time.deltaTime);
+        rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
+
+        rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
+    }
+
+    private void ResetJump()
+    {
+        readyToJump = true;
     }
 }
